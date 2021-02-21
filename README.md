@@ -1,4 +1,4 @@
-# Reaction-diffusion algoritm implementation
+# Reaction-diffusion algorithm implementation
 The details of the algorithm implemented can be found [here](https://www.karlsims.com/rd.html)
 ### Initial parameters
 ![init_params](https://github.com/nazar-ivantsiv/reaction-diffusion/blob/master/assets/initial_params.png "Initial parameters")
