@@ -68,4 +68,5 @@ plt.show()
 # Visualize the final result heatmap
 plt.axis('off')
 plt.imshow(B, cmap=plt.cm.PRGn)
+plt.colorbar()
 plt.show()
