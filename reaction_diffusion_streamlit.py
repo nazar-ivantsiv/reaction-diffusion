@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import pandas as pd
-import scipy.signal as sl
+# import scipy.signal as sl
 import torch
 import torch.nn.functional as F
 
@@ -94,33 +94,42 @@ def main():
     st.write(f'Elapsed: {time.perf_counter() - t0:.2f} sec')
 
 
-def solve(A, B, kernel, d_A, d_B, f, k, dt, iters):
-    interim_b = []
-    for i in range(iters):
-        diffusion_A = d_A * sl.convolve2d(A, kernel, mode='same', boundary='wrap')  # 2D Laplacian convolution
-        diffusion_B = d_B * sl.convolve2d(B, kernel, mode='same', boundary='wrap')
+# def solve(A, B, kernel, d_A, d_B, f, k, dt, iters):
+#     interim_b = []
+#     for i in range(iters):
+#         diffusion_A = d_A * sl.convolve2d(A, kernel, mode='same', boundary='wrap')  # 2D Laplacian convolution
+#         diffusion_B = d_B * sl.convolve2d(B, kernel, mode='same', boundary='wrap')
 
-        reaction_A = A * B**2
-        reaction_B = A * B**2
+#         reaction_A = A * B**2
+#         reaction_B = A * B**2
 
-        feed_A = f * (1 - A)
-        kill_B = (k + f) * B
+#         feed_A = f * (1 - A)
+#         kill_B = (k + f) * B
 
-        A += (diffusion_A - reaction_A + feed_A) * dt
-        B += (diffusion_B + reaction_B - kill_B) * dt
+#         A += (diffusion_A - reaction_A + feed_A) * dt
+#         B += (diffusion_B + reaction_B - kill_B) * dt
 
-        # Save interim results
-        n = iters // 10
-        if not i % n:
-            interim_b.append(B)
+#         # Save interim results
+#         n = iters // 10
+#         if not i % n:
+#             interim_b.append(B)
 
-    return A, B, interim_b
+#     return A, B, interim_b
 
 
 def solve_torch(A, B, kernel, d_A, d_B, f, k, dt, iters):
-    A_t = torch.tensor(A)
-    B_t = torch.tensor(B)
-    kernel_t = torch.tensor(kernel)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#    print(device)
+
+    A_t = torch.tensor(A, device=device)
+    B_t = torch.tensor(B, device=device)
+    kernel_t = torch.tensor(kernel, device=device)
+
+#    A_t = torch.from_numpy(A).float().to(device)
+#    B_t = torch.from_numpy(B).float().to(device)
+#    kernel_t = torch.from_numpy(kernel).float().to(device)
+
     A_t = A_t.expand(1, 1, -1, -1)
     B_t = B_t.expand(1, 1, -1, -1)
     kernel_t = kernel_t.expand(1, 1, -1, -1)
@@ -142,10 +151,10 @@ def solve_torch(A, B, kernel, d_A, d_B, f, k, dt, iters):
         # Save interim results
         n = iters // 10
         if not i % n:
-            interim_b.append(np.squeeze(B_t.numpy()).copy())
+            interim_b.append(np.squeeze(B_t.cpu().numpy()).copy())
 
-    A_out = np.squeeze(A_t.numpy())
-    B_out = np.squeeze(B_t.numpy())
+    A_out = np.squeeze(A_t.cpu().numpy())
+    B_out = np.squeeze(B_t.cpu().numpy())
 
     return A_out, B_out, interim_b
 
