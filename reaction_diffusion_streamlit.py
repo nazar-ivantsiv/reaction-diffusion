@@ -2,6 +2,9 @@ import time
 import numpy as np
 import pandas as pd
 import scipy.signal as sl
+import torch
+import torch.nn.functional as F
+
 import matplotlib.pyplot as plt
 import streamlit as st
 import SessionState  # Assuming SessionState.py lives on this folder
@@ -66,15 +69,16 @@ def main():
     # Solve the equation in a loop
     t0 = time.perf_counter()
     fig1 = plt.figure()
-    for i in range(iters):
-        A, B = solve(A, B, kernel, d_A, d_B, f, k, dt, iters)
 
-        # Generate interim results visualization
-        n = iters // 10
-        if not i % n:
-            plt.subplot(2, 5, i // n + 1)
-            plt.axis('off')
-            plt.imshow(B, cmap=plt.cm.PRGn)
+    # A, B, interim_b = solve(A, B, kernel, d_A, d_B, f, k, dt, iters)
+    A, B, interim_b = solve_torch(A, B, kernel, d_A, d_B, f, k, dt, iters)
+
+    # Visualize interim results
+    for i, b in enumerate(interim_b):
+        plt.subplot(2, 5, i+1)
+        plt.axis('off')
+        plt.imshow(b, cmap=plt.cm.PRGn)
+
 
     # Visualize the final result heatmap
     fig2 = plt.figure()
@@ -91,20 +95,59 @@ def main():
 
 
 def solve(A, B, kernel, d_A, d_B, f, k, dt, iters):
-    diffusion_A = d_A * sl.convolve2d(A, kernel, mode='same', boundary='wrap')  # 2D Laplacian convolution
-    diffusion_B = d_B * sl.convolve2d(B, kernel, mode='same', boundary='wrap')
+    interim_b = []
+    for i in range(iters):
+        diffusion_A = d_A * sl.convolve2d(A, kernel, mode='same', boundary='wrap')  # 2D Laplacian convolution
+        diffusion_B = d_B * sl.convolve2d(B, kernel, mode='same', boundary='wrap')
 
-    reaction_A = A * B**2
-    reaction_B = A * B**2
+        reaction_A = A * B**2
+        reaction_B = A * B**2
 
-    feed_A = f * (1 - A)
-    kill_B = (k + f) * B
+        feed_A = f * (1 - A)
+        kill_B = (k + f) * B
 
-    A += (diffusion_A - reaction_A + feed_A) * dt
-    B += (diffusion_B + reaction_B - kill_B) * dt
+        A += (diffusion_A - reaction_A + feed_A) * dt
+        B += (diffusion_B + reaction_B - kill_B) * dt
 
-    return A, B
+        # Save interim results
+        n = iters // 10
+        if not i % n:
+            interim_b.append(B)
 
+    return A, B, interim_b
+
+
+def solve_torch(A, B, kernel, d_A, d_B, f, k, dt, iters):
+    A_t = torch.tensor(A)
+    B_t = torch.tensor(B)
+    kernel_t = torch.tensor(kernel)
+    A_t = A_t.expand(1, 1, -1, -1)
+    B_t = B_t.expand(1, 1, -1, -1)
+    kernel_t = kernel_t.expand(1, 1, -1, -1)
+
+    interim_b = []
+    for i in range(iters):
+        diffusion_A = d_A * F.conv2d(A_t, kernel_t, padding=1)  # 2D Laplacian convolution
+        diffusion_B = d_B * F.conv2d(B_t, kernel_t, padding=1)
+
+        reaction_A = A_t * B_t**2
+        reaction_B = A_t * B_t**2
+
+        feed_A = f * (1 - A_t)
+        kill_B = (k + f) * B_t
+
+        A_t += (diffusion_A - reaction_A + feed_A) * dt
+        B_t += (diffusion_B + reaction_B - kill_B) * dt
+
+        # Save interim results
+        n = iters // 10
+        if not i % n:
+            interim_b.append(np.squeeze(B_t.numpy()).copy())
+
+    A_out = np.squeeze(A_t.numpy())
+    B_out = np.squeeze(B_t.numpy())
+
+    return A_out, B_out, interim_b
 
 
 if __name__=='__main__':
