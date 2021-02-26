@@ -1,3 +1,5 @@
 ReactionDiffusionSimulator/
 __pycache__/
+.ipynb_checkpoints/
 *.png
+align_convolution_func.ipynb
